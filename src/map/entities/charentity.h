@@ -290,6 +290,8 @@ public:
     uint32            m_moghouseID;
     uint16            m_moghancementID;
 
+    uint32            m_world;                      // World the character lives in
+
     int8			  getShieldSize();
 
     bool			  getWeaponSkillKill();

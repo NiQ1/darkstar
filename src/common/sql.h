@@ -128,7 +128,12 @@ template<typename... Args>
 int32 Sql_Query(Sql_t* self, const char* query, Args... args)
 {
     std::string query_v = fmt::sprintf(query, args...);
-	return Sql_QueryStr(self, query_v.c_str());
+	int32 res = Sql_QueryStr(self, query_v.c_str());
+    if (res == SQL_ERROR)
+    {
+        ShowError("SQL command failed: %s\n", query_v.c_str());
+    }
+    return res;
 }
 
 uint64 Sql_AffectedRows(Sql_t* self);

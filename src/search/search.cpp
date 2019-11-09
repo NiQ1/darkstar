@@ -151,6 +151,8 @@ int32 main(int32 argc, char **argv)
 #endif
 
     std::string logFile;
+    std::string searchConf = SEARCH_CONF_FILENAME;
+    std::string loginConf = LOGIN_CONF_FILENAME;
 
 #ifdef WIN32
     logFile = "log\\search-server.log";
@@ -162,7 +164,20 @@ int32 main(int32 argc, char **argv)
     for (int i = 0; i < argc; i++)
     {
         if (strcmp(argv[i], "--log") == 0)
+        {
             logFile = argv[i + 1];
+            i++;
+        }
+        else if (strcmp(argv[i], "--config") == 0)
+        {
+            searchConf = argv[i + 1];
+            i++;
+        }
+        else if (strcmp(argv[i], "--loginconfig") == 0)
+        {
+            loginConf = argv[i + 1];
+            i++;
+        }
     }
 
     InitializeLog(logFile);
@@ -176,8 +191,8 @@ int32 main(int32 argc, char **argv)
     struct addrinfo  hints;
 
     search_config_default();
-    search_config_read((const int8*)SEARCH_CONF_FILENAME);
-    login_config_read((const int8*)LOGIN_CONF_FILENAME);
+    search_config_read((const int8*)searchConf.c_str());
+    login_config_read((const int8*)loginConf.c_str());
 
 #ifdef WIN32
     // Initialize Winsock
@@ -328,6 +343,7 @@ void search_config_default()
     search_config.mysql_password = "root";
     search_config.mysql_database = "dspdb";
     search_config.mysql_port = 3306;
+    search_config.worldid = 100;
     search_config.expire_auctions = 1;
     search_config.expire_days = 3;
     search_config.expire_interval = 3600;
@@ -385,6 +401,10 @@ void search_config_read(const int8* file)
         else if (strcmp(w1, "mysql_database") == 0)
         {
             search_config.mysql_database = std::string(w2);
+        }
+        else if (strcmp(w1, "worldid") == 0)
+        {
+            search_config.worldid = atoi(w2);
         }
         else if (strcmp(w1, "expire_auctions") == 0)
         {

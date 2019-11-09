@@ -35,8 +35,10 @@ struct login_session_data_t {
     uint32 client_addr;
     uint16 client_port;
     uint32 servip;
+    uint32 priv;
 
     char charname[17];
+    uint32 worldid;
     int32 login_fd;
     int32 login_lobbydata_fd;
     int32 login_lobbyview_fd;

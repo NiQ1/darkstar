@@ -331,6 +331,10 @@ inline int32 CLuaBaseEntity::PrintToArea(lua_State* L)
     {
         message::send(MSG_CHAT_YELL, 0, 0, new CChatMessagePacket(PChar, messageLook, (char*)lua_tostring(L, 1), name));
     }
+    else if (messageRange == 5) // All zones all worlds in the universe
+    {
+        message::send(MSG_CHAT_SERVMESGLOBAL, 0, 0, new CChatMessagePacket(PChar, messageLook, (char*)lua_tostring(L, 1), name));
+    }
     /*
     Todo: Unity, LS 1 and LS 2 for the lols?
     */
@@ -2929,8 +2933,8 @@ inline int32 CLuaBaseEntity::resetPlayer(lua_State *L)
     uint32 id = 0;
 
     // char will not be logged in so get the id manually
-    const char* Query = "SELECT charid FROM chars WHERE charname = '%s';";
-    int32 ret = Sql_Query(SqlHandle, Query, charName);
+    const char* Query = "SELECT charid FROM chars WHERE worldid = %u AND charname = '%s';";
+    int32 ret = Sql_Query(SqlHandle, Query, map_config.worldid, charName);
 
     if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
         id = (int32)Sql_GetIntData(SqlHandle, 0);
@@ -3032,8 +3036,8 @@ int32 CLuaBaseEntity::gotoPlayer(lua_State* L)
     bool found = false;
     if (!lua_isnil(L, 1) && lua_isstring(L, 1))
     {
-        const char* fmtQuery = "SELECT charid FROM chars WHERE charname = '%s';";
-        int32 ret = Sql_Query(SqlHandle, fmtQuery, std::string(lua_tostring(L, 1)).c_str());
+        const char* fmtQuery = "SELECT charid FROM chars WHERE worldid = %u AND charname = '%s';";
+        int32 ret = Sql_Query(SqlHandle, fmtQuery, map_config.worldid, std::string(lua_tostring(L, 1)).c_str());
 
         if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
         {
@@ -3066,8 +3070,8 @@ inline int32 CLuaBaseEntity::bringPlayer(lua_State* L)
 
     if (!lua_isnil(L, 1) && lua_isstring(L, 1))
     {
-        const char* fmtQuery = "SELECT charid FROM chars WHERE charname = '%s';";
-        int32 ret = Sql_Query(SqlHandle, fmtQuery, std::string(lua_tostring(L, 1)).c_str());
+        const char* fmtQuery = "SELECT charid FROM chars WHERE worldid = %u AND charname = '%s';";
+        int32 ret = Sql_Query(SqlHandle, fmtQuery, map_config.worldid, std::string(lua_tostring(L, 1)).c_str());
         if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
         {
             char buf[30];

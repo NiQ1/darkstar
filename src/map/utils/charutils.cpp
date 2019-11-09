@@ -355,7 +355,8 @@ namespace charutils
             "playtime,"             // 24
             "campaign_allegiance,"  // 25
             "isstylelocked,"        // 26
-            "moghancement "         // 27
+            "moghancement,"         // 27
+            "worldid "              // 28
             "FROM chars "
             "WHERE charid = %u";
 
@@ -434,6 +435,7 @@ namespace charutils
             PChar->profile.campaign_allegiance = (uint8)Sql_GetIntData(SqlHandle, 25);
             PChar->setStyleLocked(Sql_GetIntData(SqlHandle, 26) == 1 ? true : false);
             PChar->SetMoghancement(Sql_GetUIntData(SqlHandle, 27));
+            PChar->m_world = Sql_GetUIntData(SqlHandle, 28);
         }
 
         LoadSpells(PChar);

@@ -149,21 +149,43 @@ int32 do_init(int32 argc, char** argv)
     ShowStatus("do_init: begin server initialization...");
     map_ip.s_addr = 0;
 
+    MAP_CONF_FILENAME = "./conf/map_darkstar.conf";
+
+    std::string mapConf = MAP_CONF_FILENAME;
+    uint32 worldid = 0;
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "--ip") == 0)
+        {
             map_ip.s_addr = inet_addr(argv[i + 1]);
+            i++;
+        }
         else if (strcmp(argv[i], "--port") == 0)
+        {
             map_port = std::stoi(argv[i + 1]);
+            i++;
+        }
+        else if (strcmp(argv[i], "--config") == 0)
+        {
+            mapConf = argv[i + 1];
+            i++;
+        }
+        else if (strcmp(argv[i], "--worldid") == 0)
+        {
+            map_port = std::stoi(argv[i + 1]);
+            i++;
+        }
     }
-
-    MAP_CONF_FILENAME = "./conf/map_darkstar.conf";
 
     srand((uint32)time(nullptr));
     dsprand::seed();
 
     map_config_default();
-    map_config_read((const int8*)MAP_CONF_FILENAME);
+    map_config_read((const int8*)mapConf.c_str());
+    if (worldid != 0)
+    {
+        map_config.worldid = worldid;
+    }
     ShowMessage("\t\t - " CL_GREEN"[OK]" CL_RESET"\n");
     ShowStatus("do_init: map_config is reading");
     ShowMessage("\t\t - " CL_GREEN"[OK]" CL_RESET"\n");
@@ -940,6 +962,7 @@ int32 map_config_default()
 {
     map_config.uiMapIp = INADDR_ANY;
     map_config.usMapPort = 54230;
+    map_config.worldid = 100;
     map_config.mysql_host = "127.0.0.1";
     map_config.mysql_login = "root";
     map_config.mysql_password = "root";
@@ -1062,6 +1085,10 @@ int32 map_config_read(const int8* cfgName)
         else if (strcmpi(w1, "map_port") == 0)
         {
             map_config.usMapPort = (atoi(w2));
+        }
+        else if (strcmpi(w1, "worldid") == 0)
+        {
+            map_config.worldid = (atoi(w2));
         }
         else if (strcmp(w1, "buff_maxsize") == 0)
         {

@@ -249,7 +249,12 @@ void SmallPacket0x00A(map_session_data_t* session, CCharEntity* PChar, CBasicPac
 
         uint16 destination = PChar->loc.destination;
 
-        if (destination >= MAX_ZONEID){
+        if (PChar->m_world != map_config.worldid)
+        {
+            ShowWarning("packet_system::SmallPacket0x00A player tried to enter wrong world.\n");
+            PChar->loc.destination = destination = ZONE_RESIDENTIAL_AREA;
+        }
+        else if (destination >= MAX_ZONEID) {
             ShowWarning("packet_system::SmallPacket0x00A player tried to enter zone out of range: %d\n", destination);
             PChar->loc.destination = destination = ZONE_RESIDENTIAL_AREA;
         }
@@ -1427,8 +1432,8 @@ void SmallPacket0x03D(map_session_data_t* session, CCharEntity* PChar, CBasicPac
     uint8 cmd = data.ref<uint8>(0x18);
 
     // Attempt to locate the character by their name..
-    const char* sql = "SELECT charid, accid FROM chars WHERE charname = '%s' LIMIT 1";
-    int32 ret = Sql_Query(SqlHandle, sql, name);
+    const char* sql = "SELECT charid, accid FROM chars WHERE worldid = %u AND charname = '%s' LIMIT 1";
+    int32 ret = Sql_Query(SqlHandle, sql, map_config.worldid, name);
     if (ret == SQL_ERROR || Sql_NumRows(SqlHandle) != 1 || Sql_NextRow(SqlHandle) != SQL_SUCCESS)
     {
         // Send failed..
@@ -1546,9 +1551,21 @@ void SmallPacket0x04B(map_session_data_t* session, CCharEntity* PChar, CBasicPac
 
     PChar->pushPacket(new CCharSyncPacket(PChar));
 
+    // Send world's message of the day if set
+    const char* motdQuery = "SELECT motd FROM worlds WHERE worldid = %u;";
+    int32 ret = Sql_Query(SqlHandle, motdQuery, map_config.worldid);
+    if (ret != SQL_ERROR && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+    {
+        char* motd = (char*)Sql_GetData(SqlHandle, 0);
+        if (motd != nullptr && motd[0] != '\0')
+        {
+            PChar->pushPacket(new CChatMessagePacket(PChar, CHAT_MESSAGE_TYPE::MESSAGE_SYSTEM_1, motd));
+        }
+    }
+
     // todo: kill player til theyre dead and bsod
     const char* fmtQuery = "SELECT version_mismatch FROM accounts_sessions WHERE charid = %u";
-    int32 ret = Sql_Query(SqlHandle, fmtQuery, PChar->id);
+    ret = Sql_Query(SqlHandle, fmtQuery, PChar->id);
     if (ret != SQL_ERROR && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
     {
         if ((bool)Sql_GetUIntData(SqlHandle, 0))
@@ -1660,7 +1677,7 @@ void SmallPacket0x04D(map_session_data_t* session, CCharEntity* PChar, CBasicPac
 
         if (quantity > 0 && PItem && PItem->getQuantity() >= quantity && PChar->UContainer->IsSlotEmpty(slotID))
         {
-            int32 ret = Sql_Query(SqlHandle, "SELECT charid, accid FROM chars WHERE charname = '%s' LIMIT 1;", data[0x10]);
+            int32 ret = Sql_Query(SqlHandle, "SELECT charid, accid FROM chars WHERE worldid = %u AND charname = '%s' LIMIT 1;", map_config.worldid, data[0x10]);
             if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) > 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
             {
                 uint32 charid = Sql_GetUIntData(SqlHandle, 0);
@@ -1734,7 +1751,7 @@ void SmallPacket0x04D(map_session_data_t* session, CCharEntity* PChar, CBasicPac
 
                 if (Sql_SetAutoCommit(SqlHandle, false) && Sql_TransactionStart(SqlHandle))
                 {
-                    int32 ret = Sql_Query(SqlHandle, "SELECT charid FROM chars WHERE charname = '%s' LIMIT 1", PItem->getReceiver());
+                    int32 ret = Sql_Query(SqlHandle, "SELECT charid FROM chars WHERE worldid = %u AND charname = '%s' LIMIT 1", map_config.worldid, PItem->getReceiver());
 
                     if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) > 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
                     {
@@ -1791,7 +1808,7 @@ void SmallPacket0x04D(map_session_data_t* session, CCharEntity* PChar, CBasicPac
 
             if (Sql_SetAutoCommit(SqlHandle, false) && Sql_TransactionStart(SqlHandle))
             {
-                int32 ret = Sql_Query(SqlHandle, "SELECT charid FROM chars WHERE charname = '%s' LIMIT 1", PChar->UContainer->GetItem(slotID)->getReceiver());
+                int32 ret = Sql_Query(SqlHandle, "SELECT charid FROM chars WHERE worldid = %u AND charname = '%s' LIMIT 1", map_config.worldid, PChar->UContainer->GetItem(slotID)->getReceiver());
 
                 if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) > 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
                 {
@@ -2148,7 +2165,7 @@ void SmallPacket0x04D(map_session_data_t* session, CCharEntity* PChar, CBasicPac
     }
     case 0x0C: // Confirm name (send box)
     {
-        int32 ret = Sql_Query(SqlHandle, "SELECT accid FROM chars WHERE charname = '%s' LIMIT 1", data[0x10]);
+        int32 ret = Sql_Query(SqlHandle, "SELECT accid FROM chars WHERE worldid = %u AND charname = '%s' LIMIT 1", map_config.worldid, data[0x10]);
 
         if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) > 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
         {
@@ -3314,7 +3331,7 @@ void SmallPacket0x071(map_session_data_t* session, CCharEntity* PChar, CBasicPac
             {
                 char victimName[31]{};
                 Sql_EscapeStringLen(SqlHandle, victimName, (const char*)data[0x0C], std::min<size_t>(strlen((const char*)data[0x0C]), 15));
-                int32 ret = Sql_Query(SqlHandle, "SELECT charid FROM chars WHERE charname = '%s';", victimName);
+                int32 ret = Sql_Query(SqlHandle, "SELECT charid FROM chars WHERE worldid = %u AND charname = '%s';", map_config.worldid, victimName);
                 if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) == 1 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
                 {
                     uint32 id = Sql_GetUIntData(SqlHandle, 0);
@@ -3393,14 +3410,15 @@ void SmallPacket0x071(map_session_data_t* session, CCharEntity* PChar, CBasicPac
             {
                 char victimName[31]{};
                 Sql_EscapeStringLen(SqlHandle, victimName, (const char*)data[0x0C], std::min<size_t>(strlen((const char*)data[0x0C]), 15));
-                int32 ret = Sql_Query(SqlHandle, "SELECT charid FROM chars WHERE charname = '%s';", victimName);
+                int32 ret = Sql_Query(SqlHandle, "SELECT charid FROM chars WHERE worldid = %u AND charname = '%s';", map_config.worldid, victimName);
                 if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) == 1 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
                 {
                     uint32 id = Sql_GetUIntData(SqlHandle, 0);
                     ret = Sql_Query(SqlHandle, "SELECT partyid FROM accounts_parties WHERE charid = %u AND allianceid = %u AND partyflag & %d AND partyflag & %d", id, PChar->PParty->m_PAlliance->m_AllianceID, PARTY_LEADER, PARTY_SECOND | PARTY_THIRD);
                     if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) == 1 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
                     {
-                        if (Sql_Query(SqlHandle, "UPDATE accounts_parties SET allianceid = 0, partyflag = partyflag & ~%d WHERE partyid = %u;", PARTY_SECOND | PARTY_THIRD, id) == SQL_SUCCESS && Sql_AffectedRows(SqlHandle))
+                        if (Sql_Query(SqlHandle, "UPDATE accounts_parties SET allianceid = 0, partyflag = partyflag & ~%d WHERE worldid = %u AND partyid = %u;",
+                            PARTY_SECOND | PARTY_THIRD, map_config.worldid, id) == SQL_SUCCESS && Sql_AffectedRows(SqlHandle))
                         {
                             ShowDebug(CL_CYAN"%s has removed %s party from alliance\n" CL_RESET, PChar->GetName(), data[0x0C]);
                             uint8 data[8]{};

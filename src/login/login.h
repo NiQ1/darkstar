@@ -38,6 +38,20 @@
 
 extern lan_config_t lan_config;
 
+// Single entry in the world table
+struct world_data_t
+{
+    // Unique world id (primary key in DB)
+    uint32 world_id;
+    // World name (as displayed in character list)
+    std::string world_name;
+    // Is the world currently online
+    bool is_online;
+    // Testing server, ff true, only accounts with admin priv can
+    // create characters in this world (basically Atomos).
+    bool is_test;
+};
+
 struct login_config_t
 {
     uint16 login_auth_port;         // authentication port of login server ->  54231
@@ -62,6 +76,12 @@ struct login_config_t
     uint16 msg_server_port;         // chat server port
     std::string msg_server_ip;      // chat server IP
     bool  log_user_ip;              // log user ip -> default false
+
+    std::vector<world_data_t> world_data;  // Tables of worlds associated with this login server
+    char world_packet_user[1024];  // Packet 0x24 for non-admin users (excluding test servers)
+    char world_packet_admin[1024]; // Packet 0x24 for admin users (including test servers)
+    uint32 world_packet_user_size;  // Size of the user packet in bytes
+    uint32 world_packet_admin_size; // Size of the admin packet in bytes
 };
 
 struct version_info_t

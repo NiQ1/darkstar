@@ -62,6 +62,7 @@ struct map_config_t
 
     uint16 usMapPort;               // port of map server      -> xxxxx
     uint32 uiMapIp;                 // ip of map server        -> INADDR_ANY
+    uint32 worldid;                 // world ID of the world we're serving
 
     std::string mysql_host;         // mysql addr     -> localhost:3306
     uint16 mysql_port;              // mysql port     -> 3306

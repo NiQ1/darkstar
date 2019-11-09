@@ -84,8 +84,8 @@ void CLinkshell::setMessage(const int8* message, const int8* poster)
 {
     char sqlMessage[256];
     Sql_EscapeString(SqlHandle, sqlMessage, (const char*)message);
-    Sql_Query(SqlHandle, "UPDATE linkshells SET poster = '%s', message = '%s', messagetime = %u WHERE linkshellid = %d;",
-        poster, sqlMessage , static_cast<uint32>(time(nullptr)), m_id);
+    Sql_Query(SqlHandle, "UPDATE linkshells SET poster = '%s', message = '%s', messagetime = %u WHERE linkshellid = %d and worldid = %u;",
+        poster, sqlMessage , static_cast<uint32>(time(nullptr)), m_id, map_config.worldid);
 
     int8 packetData[8] {};
     ref<uint32>(packetData, 0) = m_id;
@@ -319,7 +319,7 @@ void CLinkshell::PushPacket(uint32 senderID, CBasicPacket* packet)
 
 void CLinkshell::PushLinkshellMessage(CCharEntity* PChar, bool ls1)
 {
-    auto ret = Sql_Query(SqlHandle, "SELECT poster, message, messagetime FROM linkshells WHERE linkshellid = %u", m_id);
+    auto ret = Sql_Query(SqlHandle, "SELECT poster, message, messagetime FROM linkshells WHERE linkshellid = %u AND worldid = %u", m_id, map_config.worldid);
 
     if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
     {
@@ -346,7 +346,7 @@ namespace linkshell
 
     CLinkshell* LoadLinkshell(uint32 id)
     {
-	    int32 ret = Sql_Query(SqlHandle, "SELECT linkshellid, color, name FROM linkshells WHERE linkshellid = %d", id);
+	    int32 ret = Sql_Query(SqlHandle, "SELECT linkshellid, color, name FROM linkshells WHERE linkshellid = %d AND worldid = %u", id, map_config.worldid);
 
 	    if( ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
 	    {
@@ -425,7 +425,7 @@ namespace linkshell
 
     bool IsValidLinkshellName(const int8* name)
     {
-        auto ret = Sql_Query(SqlHandle, "SELECT linkshellid FROM linkshells WHERE name = '%s';", name);
+        auto ret = Sql_Query(SqlHandle, "SELECT linkshellid FROM linkshells WHERE worldid = %u AND name = '%s';", map_config.worldid, name);
         return ret == SQL_ERROR || Sql_NumRows(SqlHandle) == 0;
     }
 
@@ -439,7 +439,7 @@ namespace linkshell
     {
         if (IsValidLinkshellName(name))
         {
-		    if (Sql_Query(SqlHandle, "INSERT INTO linkshells (name, color) VALUES ('%s', %u)", name, color) != SQL_ERROR)
+		    if (Sql_Query(SqlHandle, "INSERT INTO linkshells (worldid, name, color) VALUES (%u, '%s', %u)", map_config.worldid, name, color) != SQL_ERROR)
             {
                 return LoadLinkshell((uint32)Sql_LastInsertId(SqlHandle))->getID();
             }
