@@ -83,7 +83,6 @@ int32 ah_cleanup(time_point tick, CTaskMgr::CTask* PTask);
 
 
 const char* SEARCH_CONF_FILENAME = "./conf/search_server.conf";
-const char* LOGIN_CONF_FILENAME = "./conf/login_darkstar.conf";
 
 void TCPComm(SOCKET socket);
 
@@ -96,7 +95,6 @@ extern search_req _HandleSearchRequest(CTCPRequestPacket& PTCPRequest);
 extern std::string toStr(int number);
 
 search_config_t search_config;
-login_config_t login_config;
 
 void search_config_default();
 void search_config_read(const int8* file);
@@ -152,7 +150,6 @@ int32 main(int32 argc, char **argv)
 
     std::string logFile;
     std::string searchConf = SEARCH_CONF_FILENAME;
-    std::string loginConf = LOGIN_CONF_FILENAME;
 
 #ifdef WIN32
     logFile = "log\\search-server.log";
@@ -173,11 +170,6 @@ int32 main(int32 argc, char **argv)
             searchConf = argv[i + 1];
             i++;
         }
-        else if (strcmp(argv[i], "--loginconfig") == 0)
-        {
-            loginConf = argv[i + 1];
-            i++;
-        }
     }
 
     InitializeLog(logFile);
@@ -187,12 +179,10 @@ int32 main(int32 argc, char **argv)
     SOCKET ListenSocket = INVALID_SOCKET;
     SOCKET ClientSocket = INVALID_SOCKET;
 
-    struct addrinfo *result = nullptr;
-    struct addrinfo  hints;
+    struct sockaddr_in server_address;
 
     search_config_default();
     search_config_read((const int8*)searchConf.c_str());
-    login_config_read((const int8*)loginConf.c_str());
 
 #ifdef WIN32
     // Initialize Winsock
@@ -202,35 +192,14 @@ int32 main(int32 argc, char **argv)
         ShowError("WSAStartup failed with error: %d\n", iResult);
         return 1;
     }
-
-    ZeroMemory(&hints, sizeof(hints));
-#else
-    memset(&hints, 0, sizeof(hints));
 #endif
-
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_PASSIVE;
-
-    // Resolve the server address and port
-    iResult = getaddrinfo(nullptr, login_config.search_server_port.c_str(), &hints, &result);
-    if (iResult != 0)
-    {
-        ShowError("getaddrinfo failed with error: %d\n", iResult);
-#ifdef WIN32
-        WSACleanup();
-#endif
-        return 1;
-    }
 
     // Create a SOCKET for connecting to server
-    ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    ListenSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (ListenSocket == INVALID_SOCKET)
     {
 #ifdef WIN32
         ShowError("socket failed with error: %ld\n", WSAGetLastError());
-        freeaddrinfo(result);
         WSACleanup();
 #else
         ShowError("socket failed with error: %ld\n", errno);
@@ -239,24 +208,25 @@ int32 main(int32 argc, char **argv)
         return 1;
     }
 
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = inet_addr(search_config.search_ip.c_str());
+    server_address.sin_port = htons(search_config.search_port);
+    memset(server_address.sin_zero, 0, sizeof(server_address.sin_zero));
+
     // Setup the TCP listening socket
-    iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+    iResult = bind(ListenSocket, (const sockaddr*)&server_address, sizeof(server_address));
     if (iResult == SOCKET_ERROR)
     {
 #ifdef WIN32
         ShowError("bind failed with error: %d\n", WSAGetLastError());
-        freeaddrinfo(result);
         closesocket(ListenSocket);
         WSACleanup();
 #else
         ShowError("bind failed with error: %d\n", errno);
-        freeaddrinfo(result);
         close(ListenSocket);
 #endif
         return 1;
     }
-
-    freeaddrinfo(result);
 
     iResult = listen(ListenSocket, SOMAXCONN);
     if (iResult == SOCKET_ERROR)
@@ -343,6 +313,8 @@ void search_config_default()
     search_config.mysql_password = "root";
     search_config.mysql_database = "dspdb";
     search_config.mysql_port = 3306;
+    search_config.search_ip = "127.0.0.1";
+    search_config.search_port = 54002;
     search_config.worldid = 100;
     search_config.expire_auctions = 1;
     search_config.expire_days = 3;
@@ -402,6 +374,14 @@ void search_config_read(const int8* file)
         {
             search_config.mysql_database = std::string(w2);
         }
+        else if (strcmp(w1, "search_ip") == 0)
+        {
+            search_config.search_ip = std::string(w2);
+        }
+        else if (strcmp(w1, "search_port") == 0)
+        {
+            search_config.search_port = atoi(w2);
+        }
         else if (strcmp(w1, "worldid") == 0)
         {
             search_config.worldid = atoi(w2);
@@ -421,59 +401,6 @@ void search_config_read(const int8* file)
         else
         {
             ShowWarning(CL_YELLOW"Unknown setting '%s' in file %s\n" CL_RESET, w1, file);
-        }
-    }
-    fclose(fp);
-}
-
-/************************************************************************
-*                                                                       *
-*  login_darkstar                                                       *
-*                                                                       *
-************************************************************************/
-
-void login_config_default()
-{
-    login_config.search_server_port = "54002";
-}
-
-
-/************************************************************************
-*                                                                       *
-*  login_darkstar                                                       *
-*                                                                       *
-************************************************************************/
-
-void login_config_read(const int8* file)
-{
-    char line[1024], w1[1024], w2[1024];
-    FILE* fp;
-
-    fp = fopen((const char*)file, "r");
-    if (fp == nullptr)
-    {
-        ShowError("configuration file not found at: %s\n", file);
-        return;
-    }
-
-    while (fgets(line, sizeof(line), fp))
-    {
-        char* ptr;
-
-        if (line[0] == '#')
-            continue;
-        if (sscanf(line, "%[^:]: %[^\t\r\n]", w1, w2) < 2)
-            continue;
-
-        //Strip trailing spaces
-        ptr = w2 + strlen(w2);
-        while (--ptr >= w2 && *ptr == ' ');
-        ptr++;
-        *ptr = '\0';
-
-        if (strcmp(w1, "search_server_port") == 0)
-        {
-            login_config.search_server_port = std::string(w2);
         }
     }
     fclose(fp);

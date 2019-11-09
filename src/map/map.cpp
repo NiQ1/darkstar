@@ -172,7 +172,7 @@ int32 do_init(int32 argc, char** argv)
         }
         else if (strcmp(argv[i], "--worldid") == 0)
         {
-            map_port = std::stoi(argv[i + 1]);
+            worldid = std::stoi(argv[i + 1]);
             i++;
         }
     }

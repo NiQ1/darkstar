@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: Nov 08, 2019 at 04:03 PM
+-- Generation Time: Nov 09, 2019 at 10:18 PM
 -- Server version: 10.3.12-MariaDB
 -- PHP Version: 5.6.6
 
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `accounts_sessions` (
 -- Indexes for table `accounts_sessions`
 --
 ALTER TABLE `accounts_sessions`
-  ADD PRIMARY KEY (`charid`), ADD UNIQUE KEY `accid` (`accid`);
+  ADD PRIMARY KEY (`charid`), ADD KEY `accid` (`accid`), ADD KEY `charid` (`charid`);
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
