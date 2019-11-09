@@ -18,6 +18,7 @@
 //#endif
 
 #include "fmt/printf.h"
+#include "showmsg.h"
 
 // Return codes
 #define SQL_ERROR -1
