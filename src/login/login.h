@@ -36,8 +36,6 @@
 
 #include "login_session.h"
 
-extern lan_config_t lan_config;
-
 // Single entry in the world table
 struct world_data_t
 {
