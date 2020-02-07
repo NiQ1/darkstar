@@ -266,8 +266,8 @@ void LoadNPCList()
           name_prefix, \
           content_tag, \
           widescan \
-        FROM npc_list INNER JOIN zone_settings \
-        ON (npcid & 0xFFF000) >> 12 = zone_settings.zoneid \
+        FROM npc_list INNER JOIN zone_servers \
+        ON (npcid & 0xFFF000) >> 12 = zone_servers.zoneid \
         WHERE IF(%d <> 0, '%s' = zoneip AND %d = zoneport, TRUE);";
 
     int32 ret = Sql_Query(SqlHandle, Query, map_ip.s_addr, inet_ntoa(map_ip), map_port);
@@ -358,7 +358,7 @@ void LoadMOBList()
             FROM mob_groups INNER JOIN mob_pools ON mob_groups.poolid = mob_pools.poolid \
             INNER JOIN mob_spawn_points ON mob_groups.groupid = mob_spawn_points.groupid \
             INNER JOIN mob_family_system ON mob_pools.familyid = mob_family_system.familyid \
-            INNER JOIN zone_settings ON mob_groups.zoneid = zone_settings.zoneid \
+            INNER JOIN zone_servers ON mob_groups.zoneid = zone_servers.zoneid \
             WHERE NOT (pos_x = 0 AND pos_y = 0 AND pos_z = 0) AND IF(%d <> 0, '%s' = zoneip AND %d = zoneport, TRUE) \
             AND mob_groups.zoneid = ((mobid >> 12) & 0xFFF);";
 
@@ -532,7 +532,7 @@ void LoadMOBList()
         FROM mob_pets \
         LEFT JOIN mob_spawn_points ON mob_pets.mob_mobid = mob_spawn_points.mobid \
         LEFT JOIN mob_groups ON mob_spawn_points.groupid = mob_groups.groupid \
-        INNER JOIN zone_settings ON mob_groups.zoneid = zone_settings.zoneid \
+        INNER JOIN zone_servers ON mob_groups.zoneid = zone_servers.zoneid \
         WHERE IF(%d <> 0, '%s' = zoneip AND %d = zoneport, TRUE) \
         AND mob_groups.zoneid = ((mobid >> 12) & 0xFFF);";
 
@@ -618,7 +618,7 @@ void LoadZoneList()
     g_PTrigger = new CNpcEntity();  // нужно в конструкторе CNpcEntity задавать модель по умолчанию
 
     std::vector<uint16> zones;
-    const char* query = "SELECT zoneid FROM zone_settings WHERE IF(%d <> 0, '%s' = zoneip AND %d = zoneport, TRUE);";
+    const char* query = "SELECT zoneid FROM zone_servers WHERE IF(%d <> 0, '%s' = zoneip AND %d = zoneport, TRUE);";
 
     int ret = Sql_Query(SqlHandle, query, map_ip.s_addr, inet_ntoa(map_ip), map_port);
 
@@ -1023,7 +1023,7 @@ void ForEachZone(std::function<void(CZone*)> func)
 uint64 GetZoneIPP(uint16 zoneID)
 {
     uint64 ipp = 0;
-    const char* query = "SELECT zoneip, zoneport FROM zone_settings WHERE zoneid = %u;";
+    const char* query = "SELECT zoneip, zoneport FROM zone_servers WHERE zoneid = %u;";
 
     int ret = Sql_Query(SqlHandle, query, zoneID);
 

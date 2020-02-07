@@ -31,6 +31,7 @@ class CBasicPacket;
 
 struct chat_message_t
 {
+    zmq::message_t* world;
     zmq::message_t* type;
     zmq::message_t* data;
     zmq::message_t* packet;

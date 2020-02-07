@@ -120,7 +120,7 @@ void CTransportHandler::InitializeTransport()
     const char* fmtQuery = "SELECT id, transport, door, dock_x, dock_y, dock_z, dock_rot, \
                             boundary, zone, anim_arrive, anim_depart, time_offset, time_interval, \
                             time_waiting, time_anim_arrive, time_anim_depart FROM transport LEFT JOIN \
-                            zone_settings ON ((transport >> 12) & 0xFFF) = zoneid WHERE \
+                            zone_servers ON ((transport >> 12) & 0xFFF) = zoneid WHERE \
                             IF(%d <> 0, '%s' = zoneip AND %d = zoneport, TRUE);";
 
     int32 ret = Sql_Query(SqlHandle, fmtQuery, map_ip.s_addr, inet_ntoa(map_ip), map_port);
@@ -180,7 +180,7 @@ void CTransportHandler::InitializeTransport()
 
     fmtQuery = "SELECT zone, time_offset, time_interval, time_waiting, time_anim_arrive, time_anim_depart \
                 FROM transport LEFT JOIN \
-                zone_settings ON zone = zoneid WHERE \
+                zone_servers ON zone = zoneid WHERE \
                 IF(%d <> 0, '%s' = zoneip AND %d = zoneport, TRUE)";
 
     ret = Sql_Query(SqlHandle, fmtQuery, map_ip.s_addr, inet_ntoa(map_ip), map_port);

@@ -59,6 +59,7 @@ namespace message
             message_queue.pop();
             try
             {
+                zSocket->send(*msg.world, ZMQ_SNDMORE);
                 zSocket->send(*msg.type, ZMQ_SNDMORE);
                 zSocket->send(*msg.data, ZMQ_SNDMORE);
                 zSocket->send(*msg.packet);
@@ -175,6 +176,7 @@ namespace message
             break;
         }
         case MSG_CHAT_SERVMES:
+        case MSG_CHAT_SERVMESGLOBAL:
         {
             zoneutils::ForEachZone([&packet](CZone* PZone)
             {
@@ -256,9 +258,9 @@ namespace message
                     {
                         if (PInviter->PParty->m_PAlliance)
                         {
-                            ret = Sql_Query(SqlHandle, "SELECT * FROM accounts_parties WHERE allianceid <> 0 AND \
+                            ret = Sql_Query(SqlHandle, "SELECT * FROM accounts_parties WHERE allianceid <> 0 AND worldid = %u AND \
                                                         allianceid = (SELECT allianceid FROM accounts_parties where \
-                                                        charid = %u) GROUP BY partyid;", inviterId);
+                                                        charid = %u) GROUP BY partyid;", map_config.worldid, inviterId);
                             if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) > 0 && Sql_NumRows(SqlHandle) < 3)
                             {
                                 PInviter->PParty->m_PAlliance->addParty(inviteeId);
@@ -607,7 +609,7 @@ namespace message
         //if no ip/port were supplied, set to 1 (0 is not valid for an identity)
         if (map_ip.s_addr == 0 && map_port == 0)
         {
-            int ret = Sql_Query(SqlHandle, "SELECT zoneip, zoneport FROM zone_settings GROUP BY zoneip, zoneport ORDER BY COUNT(*) DESC;");
+            int ret = Sql_Query(SqlHandle, "SELECT zoneip, zoneport FROM zone_servers WHERE worldid = %u GROUP BY zoneip, zoneport ORDER BY COUNT(*) DESC;", map_config.worldid);
             if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) > 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
             {
                 ipp = inet_addr((const char*)Sql_GetData(SqlHandle, 0));
@@ -653,6 +655,8 @@ namespace message
     {
         std::lock_guard<std::mutex> lk(send_mutex);
         chat_message_t msg;
+        msg.world = new zmq::message_t(sizeof(uint32));
+        ref<uint32>((uint32*)msg.world->data(), 0) = map_config.worldid;
         msg.type = new zmq::message_t(sizeof(MSGSERVTYPE));
         ref<uint8>((uint8*)msg.type->data(), 0) = type;
 

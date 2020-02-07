@@ -25,6 +25,7 @@
 #include "../common/timer.h"
 #include "../common/version.h"
 #include "../common/utils.h"
+#include "../common/md52.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,6 +60,114 @@ maint_config_t maint_config;
 Sql_t *SqlHandle = nullptr;
 std::thread messageThread;
 std::thread consoleInputThread;
+
+// Populate the world list from DB or if does not exist then fall back to
+// single world whose name is taken from the conf file.
+void read_world_data()
+{
+    // Packet 0x24 header (seems to be constant other than size)
+    const char packet_header[] = LOBBY_WORLD_LIST_HEADER;
+    // Current world name when iterating
+    int8* current_world_name = NULL;
+    // Current world data when iterating
+    world_data_t current_world = { 0 };
+    // If world name is NULL we fall back to using the conf server name,
+    // but only once, so we need to track that
+    bool used_server_name = false;
+    // Initialize the contstant portions of the packet (will need to fix packet size later on)
+    assert(sizeof(packet_header) < sizeof(login_config.world_packet_admin));
+    assert(sizeof(packet_header) < sizeof(login_config.world_packet_user));
+    memcpy(login_config.world_packet_admin, packet_header, sizeof(packet_header));
+    memcpy(login_config.world_packet_user, packet_header, sizeof(packet_header));
+    memset(login_config.world_packet_admin + sizeof(packet_header), 0, sizeof(login_config.world_packet_admin) - sizeof(packet_header));
+    memset(login_config.world_packet_user + sizeof(packet_header), 0, sizeof(login_config.world_packet_user) - sizeof(packet_header));
+    login_config.world_packet_admin_size = sizeof(packet_header);
+    login_config.world_packet_user_size = sizeof(packet_header);
+    const char *pfmtQuery = "SELECT worldid, worldname, online, testworld FROM worlds ORDER BY worldid;";
+    int32 ret = Sql_Query(SqlHandle, pfmtQuery);
+    if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0)
+    {
+        while (Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+        {
+            current_world.world_id = Sql_GetUIntData(SqlHandle, 0);
+            current_world_name = Sql_GetData(SqlHandle, 1);
+            if (current_world_name && current_world_name[0] != '\0')
+            {
+                current_world.world_name = (char*)current_world_name;
+            }
+            else
+            {
+                // World name is empty, so we fall back to use the server name
+                // specified in conf, but we can only do this one (world names have to be unique)
+                if (!used_server_name)
+                {
+                    current_world.world_name = login_config.servername;
+                    used_server_name = true;
+                }
+                else
+                {
+                    // Skip all worlds without names except the first
+                    continue;
+                }
+            }
+            current_world.is_online = (bool)Sql_GetUIntData(SqlHandle, 2);
+            current_world.is_test = (bool)Sql_GetUIntData(SqlHandle, 3);
+            login_config.world_data.push_back(current_world);
+            if (current_world.is_online)
+            {
+                // Add to raw packet buffers
+                // Each record in the packet is 20 bytes (uint32 id, 15-char name, null terminator)
+                // so we need to make sure that the packet buffer is large enough to hold it
+                if (login_config.world_packet_admin_size + 20 <= sizeof(login_config.world_packet_admin) &&
+                    login_config.world_packet_user_size + 20 <= sizeof(login_config.world_packet_user))
+                {
+                    *(uint32*)(login_config.world_packet_admin + login_config.world_packet_admin_size) = current_world.world_id;
+                    // Note: Counting on the packet being memset to zero (which we have done above, otherwise would have
+                    // to pad to 15 bytes with zeros and add a null terminator at 16th position
+                    memcpy(login_config.world_packet_admin + login_config.world_packet_admin_size + 4, current_world.world_name.c_str(),
+                        current_world.world_name.length() < 15 ? current_world.world_name.length() : 15);
+                    if (!current_world.is_test)
+                    {
+                        // Not a test server so same packet added to user packet as well
+                        memcpy(login_config.world_packet_user + login_config.world_packet_user_size, login_config.world_packet_admin + login_config.world_packet_admin_size, 20);
+                        login_config.world_packet_user_size += 20;
+                    }
+                    login_config.world_packet_admin_size += 20;
+                }
+            }
+        }
+    }
+    else
+    {
+        // World table empty or doesn't exist so fall back to single world with name taken
+        // from the login conf file
+        // By defult retail starts world id from 0x64, don't know why, but it works so keep it as it is
+        current_world.world_id = 0x64;
+        current_world.world_name = login_config.servername;
+        current_world.is_online = true;
+        current_world.is_test = false;
+        login_config.world_data.push_back(current_world);
+        if (login_config.world_packet_admin_size + 20 <= sizeof(login_config.world_packet_admin) &&
+            login_config.world_packet_user_size + 20 <= sizeof(login_config.world_packet_user))
+        {
+            *(uint32*)(login_config.world_packet_admin + login_config.world_packet_admin_size) = current_world.world_id;
+            memcpy(login_config.world_packet_admin + login_config.world_packet_admin_size + 4, current_world.world_name.c_str(),
+                current_world.world_name.length() < 15 ? current_world.world_name.length() : 15);
+            memcpy(login_config.world_packet_user + login_config.world_packet_user_size, login_config.world_packet_admin + login_config.world_packet_admin_size, 20);
+            login_config.world_packet_user_size += 20;
+            login_config.world_packet_admin_size += 20;
+        }
+    }
+    // Fix packet sizes
+    *(uint32*)login_config.world_packet_admin = login_config.world_packet_admin_size;
+    *(uint32*)login_config.world_packet_user = login_config.world_packet_user_size;
+    // Add hashes
+    unsigned char Hash[16];
+    md5((unsigned char*)(login_config.world_packet_admin), Hash, login_config.world_packet_admin_size);
+    memcpy(login_config.world_packet_admin + 12, Hash, sizeof(Hash));
+    md5((unsigned char*)(login_config.world_packet_user), Hash, login_config.world_packet_user_size);
+    memcpy(login_config.world_packet_user + 12, Hash, sizeof(Hash));
+}
 
 int32 do_init(int32 argc, char** argv)
 {
@@ -117,6 +226,8 @@ int32 do_init(int32 argc, char** argv)
     {
         ShowError("do_init: Impossible to optimise tables\n");
     }
+
+    read_world_data();
 
     messageThread = std::thread(message_server_init);
     ShowStatus("The login-server is " CL_GREEN"ready" CL_RESET" to work...\n");

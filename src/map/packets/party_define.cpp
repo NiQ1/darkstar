@@ -48,9 +48,9 @@ CPartyDefinePacket::CPartyDefinePacket(CParty* PParty)
         uint8 i = 0;
 
         int ret = Sql_Query(SqlHandle, "SELECT chars.charid, partyflag, pos_zone, pos_prevzone FROM accounts_parties \
-									   	LEFT JOIN chars ON accounts_parties.charid = chars.charid WHERE \
+									   	LEFT JOIN chars ON accounts_parties.charid = chars.charid WHERE chars.worldid = %u AND \
 										IF (allianceid <> 0, allianceid = %d, partyid = %d) ORDER BY partyflag & %u, timestamp;",
-            allianceid, PParty->GetPartyID(), PARTY_SECOND | PARTY_THIRD);
+            map_config.worldid, allianceid, PParty->GetPartyID(), PARTY_SECOND | PARTY_THIRD);
         if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) > 0)
         {
             while (Sql_NextRow(SqlHandle) == SQL_SUCCESS)

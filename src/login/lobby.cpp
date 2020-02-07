@@ -32,6 +32,7 @@
 
 #include "login.h"
 #include "lobby.h"
+#include "account.h"
 
 
 int32 login_lobbydata_fd;
@@ -147,7 +148,7 @@ int32 lobbydata_parse(int32 fd)
                             race, face, head, body, hands, legs, feet, main, sub,\
                             war, mnk, whm, blm, rdm, thf, pld, drk, bst, brd, rng,\
                             sam, nin, drg, smn, blu, cor, pup, dnc, sch, geo, run, \
-                            gmlevel \
+                            gmlevel, worldid \
                         FROM chars \
                             INNER JOIN char_stats USING(charid)\
                             INNER JOIN char_look  USING(charid) \
@@ -165,7 +166,7 @@ int32 lobbydata_parse(int32 fd)
                 LOBBY_A1_RESERVEPACKET(ReservePacket);
 
                 //server's name that shows in lobby menu
-                memcpy(ReservePacket + 60, login_config.servername.c_str(), std::clamp<size_t>(login_config.servername.length(), 0, 15));
+                memcpy(ReservePacket + 60, login_config.servername.c_str(), std::clamp<size_t>(login_config.servername.length()+1, 0, 15));
 
                 // Prepare the character list data..
                 for (int j = 0; j < 16; ++j)
@@ -190,6 +191,7 @@ int32 lobbydata_parse(int32 fd)
                     if (maint_config.maint_mode == 0 || gmlevel > 0)
                     {
                         uint32 CharID = Sql_GetIntData(SqlHandle, 0);
+                        uint32 WorldID = Sql_GetUIntData(SqlHandle, 37);
 
                         uint16 zone = (uint16)Sql_GetIntData(SqlHandle, 2);
 
@@ -201,11 +203,20 @@ int32 lobbydata_parse(int32 fd)
                         ref<uint32>(CharList, 32 + 140 * i) = CharID;
 
                         ref<uint32>(uList, 20 * (i + 1)) = CharID;
+                        //ref<uint32>(uList, (16 * (i + 1)) + 4) = CharID;
 
                         ////////////////////////////////////////////////////
                         ref<uint32>(CharList, 4 + 32 + i * 140) = CharID;
 
                         memcpy(CharList + 12 + 32 + i * 140, strCharName, 15);
+                        for (std::vector<world_data_t>::iterator it = login_config.world_data.begin(); it != login_config.world_data.end(); ++it)
+                        {
+                            if (WorldID == it->world_id)
+                            {
+                                memcpy(CharList + 28 + 32 + i * 140, it->world_name.c_str(), std::clamp<size_t>(it->world_name.length()+1, 0, 15));
+                                break;
+                            }
+                        }
 
                         ref<uint8>(CharList, 46 + 32 + i * 140) = MainJob;
                         ref<uint8>(CharList, 73 + 32 + i * 140) = lvlMainJob;
@@ -301,9 +312,34 @@ int32 lobbydata_parse(int32 fd)
 
                 uint32 charid = ref<uint32>(session[sd->login_lobbyview_fd]->rdata.data(), 28);
 
-                const char* fmtQuery = "SELECT zoneip, zoneport, zoneid, pos_prevzone, gmlevel \
+                uint32 worldid = 0;
+                bool world_online = false;
+                bool test_world = false;
+                const char* worldFmtQuery = "SELECT worlds.worldid, online, testworld FROM chars,worlds WHERE chars.worldid = worlds.worldid AND charid = %u;";
+                if (Sql_Query(SqlHandle, worldFmtQuery, charid) != SQL_ERROR &&
+                    Sql_NumRows(SqlHandle) != 0)
+                {
+                    Sql_NextRow(SqlHandle);
+                    worldid = Sql_GetUIntData(SqlHandle, 0);
+                }
+                for (std::vector<world_data_t>::iterator it = login_config.world_data.begin(); it != login_config.world_data.end(); ++it)
+                {
+                    if (worldid == it->world_id)
+                    {
+                        world_online = it->is_online;
+                        test_world = it->is_test;
+                        break;
+                    }
+                }
+
+                /*const char* fmtQuery = "SELECT zoneip, zoneport, zoneid, pos_prevzone, gmlevel \
                                         FROM zone_settings, chars \
-                                        WHERE IF(pos_zone = 0, zoneid = pos_prevzone, zoneid = pos_zone) AND charid = %u AND accid = %u;";
+                                        WHERE IF(pos_zone = 0, zoneid = pos_prevzone, zoneid = pos_zone) AND charid = %u AND accid = %u;";*/
+                const char* fmtQuery = "SELECT zoneip, zoneport, zone_settings.zoneid, pos_prevzone, gmlevel \
+                                        FROM zone_settings, zone_servers, chars \
+                                        WHERE zone_settings.zoneid = zone_servers.zoneid AND \
+                                        IF(pos_zone = 0, zone_settings.zoneid = pos_prevzone, zone_settings.zoneid = pos_zone) AND \
+                                        zone_servers.worldid = chars.worldid AND charid = %u AND accid = %u;";
                 uint32 ZoneIP = sd->servip;
                 uint16 ZonePort = 54230;
                 uint16 ZoneID = 0;
@@ -328,13 +364,26 @@ int32 lobbydata_parse(int32 fd)
                     ref<uint16>(ReservePacket, (0x3C)) = ZonePort;
                     ShowInfo("lobbydata_parse: zoneid:(%u),zoneip:(%s),zoneport:(%u) for char:(%u)\n", ZoneID, ip2str(ntohl(ZoneIP), nullptr), ZonePort, charid);
 
-                    if (maint_config.maint_mode == 0 || gmlevel > 0)
+                    if ((maint_config.maint_mode == 0 || gmlevel > 0) && (world_online) && (test_world == false || sd->priv & (ACCPRIV_ADMIN | ACCPRIV_ROOT)))
                     {
                         if (PrevZone == 0)
                             Sql_Query(SqlHandle, "UPDATE chars SET pos_prevzone = %d WHERE charid = %u;", ZoneID, charid);
 
-                        ref<uint32>(ReservePacket, (0x40)) = sd->servip;                                  // search-server ip
-                        ref<uint16>(ReservePacket, (0x44)) = login_config.search_server_port;             // search-server port
+                        // Worlds table may override search server settings
+                        uint32 searchIP = sd->servip;
+                        uint32 searchPort = login_config.search_server_port;
+                        const char* searchFmtQuery = "SELECT searchip, searchport FROM worlds WHERE worldid = %u;";
+                        if (Sql_Query(SqlHandle, searchFmtQuery, worldid) != SQL_ERROR &&
+                            Sql_NumRows(SqlHandle) != 0)
+                        {
+                            if (Sql_NextRow(SqlHandle) == SQL_SUCCESS)
+                            {
+                                searchIP = inet_addr((const char*)Sql_GetData(SqlHandle, 0));
+                                searchPort = Sql_GetUIntData(SqlHandle, 1);
+                            }
+                        }
+                        ref<uint32>(ReservePacket, (0x40)) = searchIP;               // search-server ip
+                        ref<uint16>(ReservePacket, (0x44)) = searchPort;             // search-server port
 
                         memcpy(MainReservePacket, ReservePacket, ref<uint8>(ReservePacket, 0));
 
@@ -344,9 +393,9 @@ int32 lobbydata_parse(int32 fd)
                         char session_key[sizeof(key3) * 2 + 1];
                         bin2hex(session_key, key3, sizeof(key3));
 
-                        fmtQuery = "INSERT INTO accounts_sessions(accid,charid,session_key,server_addr,server_port,client_addr, version_mismatch) VALUES(%u,%u,x'%s',%u,%u,%u,%u)";
+                        fmtQuery = "INSERT INTO accounts_sessions(accid,charid,worldid,session_key,server_addr,server_port,client_addr, version_mismatch) VALUES(%u,%u,%u,x'%s',%u,%u,%u,%u)";
 
-                        if (Sql_Query(SqlHandle, fmtQuery, sd->accid, charid, session_key, ZoneIP, ZonePort, sd->client_addr, (uint8)session[sd->login_lobbyview_fd]->ver_mismatch) == SQL_ERROR)
+                        if (Sql_Query(SqlHandle, fmtQuery, sd->accid, charid, worldid, session_key, ZoneIP, ZonePort, sd->client_addr, (uint8)session[sd->login_lobbyview_fd]->ver_mismatch) == SQL_ERROR)
                         {
                             //отправляем клиенту сообщение об ошибке
                             LOBBBY_ERROR_MESSAGE(ReservePacket);
@@ -361,6 +410,7 @@ int32 lobbydata_parse(int32 fd)
                     }
                     else
                     {
+                        // Maintenance mode and user is not a GM or world is offline or world is a test server and user is not a tester
                         LOBBBY_ERROR_MESSAGE(ReservePacket);
                         ref<uint16>(ReservePacket, 32) = 321;
                         memcpy(MainReservePacket, ReservePacket, ref<uint8>(ReservePacket, 0));
@@ -641,6 +691,7 @@ int32 lobbyview_parse(int32 fd)
             break;
             case 0x24:
             {
+                /*
                 LOBBY_024_RESERVEPACKET(ReservePacket);
                 memcpy(ReservePacket + 36, login_config.servername.c_str(), std::clamp<size_t>(login_config.servername.length(), 0, 15));
 
@@ -651,6 +702,16 @@ int32 lobbyview_parse(int32 fd)
                 memcpy(ReservePacket + 12, Hash, 16);
                 uint8 SendBuffSize = 64;
                 session[fd]->wdata.append((const char*)ReservePacket, SendBuffSize);
+                */
+                // If account priv is admin or root then it has access to test servers
+                if (sd->priv & (ACCPRIV_ADMIN | ACCPRIV_ROOT))
+                {
+                    session[fd]->wdata.append((const char*)login_config.world_packet_admin, login_config.world_packet_admin_size);
+                }
+                else
+                {
+                    session[fd]->wdata.append((const char*)login_config.world_packet_user, login_config.world_packet_user_size);
+                }
                 RFIFOSKIP(fd, session[fd]->rdata.size());
                 RFIFOFLUSH(fd);
 
@@ -718,35 +779,83 @@ int32 lobbyview_parse(int32 fd)
                 else
                 {
                     //creating new char
-                    char CharName[15];
-                    memset(CharName, 0, sizeof(CharName));
-                    memcpy(CharName, session[fd]->rdata.data() + 32, sizeof(CharName));
 
-                    //find assigns
-                    const char *fmtQuery = "SELECT charname FROM chars WHERE charname LIKE '%s'";
-
-                    std::string myNameIs(&CharName[0]);
-                    bool invalidName = false;
-                    for (auto letters : myNameIs)
-                    {
-                        if (!std::isalpha(letters))
-                        {
-                            invalidName = true;
-                            break;
-                        }
-                    }
-
-                    char escapedCharName[16 * 2 + 1];
-                    Sql_EscapeString(SqlHandle, escapedCharName, CharName);
-                    if (Sql_Query(SqlHandle, fmtQuery, escapedCharName) == SQL_ERROR)
+                    // Packet contains the world name rather than its id so look it up
+                    char WorldName[16];
+                    memset(WorldName, 0, sizeof(WorldName));
+                    strncpy(WorldName, session[fd]->rdata.data() + 64, sizeof(WorldName) - 1);
+                    const char *worldFmtQuery = "SELECT worldid, online, testworld FROM worlds WHERE worldname LIKE '%s'";
+                    char escapedWorldName[16 * 2 + 1];
+                    Sql_EscapeString(SqlHandle, escapedWorldName, WorldName);
+                    bool invalidWorld = false;
+                    bool unauthorizedWorld = false;
+                    bool isOffline = false;
+                    if (Sql_Query(SqlHandle, worldFmtQuery, escapedWorldName) == SQL_ERROR)
                     {
                         do_close_lobbyview(sd, fd);
                         return -1;
                     }
-
-                    if (Sql_NumRows(SqlHandle) != 0 || invalidName == true)
+                    if (Sql_NumRows(SqlHandle) == 0 || Sql_NextRow(SqlHandle) != SQL_SUCCESS)
                     {
-                        if (invalidName == true)
+                        invalidWorld = true;
+                    }
+                    else
+                    {
+                        isOffline = !(bool)Sql_GetUIntData(SqlHandle, 1);
+                        // Prevent non-admin users from creating characters on test servers by modifying packets
+                        bool isTestServer = (bool)Sql_GetUIntData(SqlHandle, 2);
+                        if (isTestServer && ((sd->priv & ((uint32)(ACCPRIV_ADMIN | ACCPRIV_ROOT))) == 0))
+                        {
+                            unauthorizedWorld = true;
+                        }
+                    }
+                    uint32 WorldId = Sql_GetUIntData(SqlHandle, 0);
+                    uint64 charNumRows = 0;
+                    char CharName[16];
+                    memset(CharName, 0, sizeof(CharName));
+                    strncpy(CharName, session[fd]->rdata.data() + 32, sizeof(CharName) - 1);
+                    bool invalidName = false;
+
+                    if (invalidWorld == false && unauthorizedWorld == false && isOffline == false)
+                    {
+                        //find assigns
+                        const char *fmtQuery = "SELECT charname FROM chars WHERE worldid = %u AND charname LIKE '%s'";
+
+                        std::string myNameIs(&CharName[0]);
+                        for (auto letters : myNameIs)
+                        {
+                            if (!std::isalpha(letters))
+                            {
+                                invalidName = true;
+                                break;
+                            }
+                        }
+
+                        char escapedCharName[16 * 2 + 1];
+                        Sql_EscapeString(SqlHandle, escapedCharName, CharName);
+                        if (Sql_Query(SqlHandle, fmtQuery, WorldId, escapedCharName) == SQL_ERROR)
+                        {
+                            do_close_lobbyview(sd, fd);
+                            return -1;
+                        }
+                        charNumRows = Sql_NumRows(SqlHandle);
+                    }
+
+                    if (charNumRows != 0 || invalidName == true || invalidWorld == true || unauthorizedWorld == true || isOffline == true)
+                    {
+                        if (invalidWorld == true)
+                        {
+                            ShowWarning(CL_WHITE"lobbyview_parse:" CL_RESET" world name name " CL_WHITE"<%s>" CL_RESET" invalid\n", WorldName);
+                        }
+                        else if (isOffline == true)
+                        {
+                            ShowWarning(CL_WHITE"lobbyview_parse:" CL_RESET" world name name " CL_WHITE"<%s>" CL_RESET" offline\n", WorldName);
+                        }
+                        else if (unauthorizedWorld == true)
+                        {
+                            ShowWarning(CL_WHITE"lobbyview_parse:" CL_RESET" world name name " CL_WHITE"<%s>" CL_RESET" unauthorized\n", WorldName);
+                        }
+                        else if (invalidName == true)
                         {
                             ShowWarning(CL_WHITE"lobbyview_parse:" CL_RESET" character name " CL_WHITE"<%s>" CL_RESET" invalid\n", CharName);
                         }
@@ -765,6 +874,7 @@ int32 lobbyview_parse(int32 fd)
                     {
                         //copy charname
                         memcpy(sd->charname, CharName, 15);
+                        sd->worldid = WorldId;
                         sendsize = 0x20;
                         LOBBY_ACTION_DONE(ReservePacket);
                         memcpy(MainReservePacket, ReservePacket, sendsize);
@@ -813,6 +923,7 @@ int32 lobby_createchar(login_session_data_t *loginsd, int8 *buf)
     char_mini createchar;
 
     memcpy(createchar.m_name, loginsd->charname, 16);
+    createchar.m_world = loginsd->worldid;
     memset(&createchar.m_look, 0, sizeof(look_t));
 
     createchar.m_look.race = ref<uint8>(buf, 48);
@@ -883,9 +994,9 @@ int32 lobby_createchar(login_session_data_t *loginsd, int8 *buf)
 
 int32 lobby_createchar_save(uint32 accid, uint32 charid, char_mini* createchar)
 {
-    const char* Query = "INSERT INTO chars(charid,accid,charname,pos_zone,nation) VALUES(%u,%u,'%s',%u,%u);";
+    const char* Query = "INSERT INTO chars(charid,accid,worldid,charname,pos_zone,nation) VALUES(%u,%u,%u,'%s',%u,%u);";
 
-    if (Sql_Query(SqlHandle, Query, charid, accid, createchar->m_name, createchar->m_zone, createchar->m_nation) == SQL_ERROR)
+    if (Sql_Query(SqlHandle, Query, charid, accid, createchar->m_world, createchar->m_name, createchar->m_zone, createchar->m_nation) == SQL_ERROR)
     {
         ShowDebug(CL_WHITE"lobby_ccsave" CL_RESET": char<" CL_WHITE"%s" CL_RESET">, accid: %u, charid: %u\n", createchar->m_name, accid, charid);
         return -1;

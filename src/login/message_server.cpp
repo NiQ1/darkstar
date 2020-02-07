@@ -77,11 +77,12 @@ void message_server_send(uint64 ipp, MSGSERVTYPE type, zmq::message_t* extra, zm
     }
 }
 
-void message_server_parse(MSGSERVTYPE type, zmq::message_t* extra, zmq::message_t* packet, zmq::message_t* from)
+void message_server_parse(MSGSERVTYPE type, zmq::message_t* extra, zmq::message_t* packet, zmq::message_t* world, zmq::message_t* from)
 {
     int ret = SQL_ERROR;
     in_addr from_ip;
     uint16 from_port = 0;
+    uint32 from_world = 0;
     bool ipstring = false;
 
     if (from)
@@ -89,6 +90,7 @@ void message_server_parse(MSGSERVTYPE type, zmq::message_t* extra, zmq::message_
         from_ip.s_addr = ref<uint32>((uint8*)from->data(), 0);
         from_port = ref<uint16>((uint8*)from->data(), 4);
     }
+    from_world = ref<uint32>((uint32*)world->data(), 0);
     switch (type)
     {
         case MSG_CHAT_TELL:
@@ -96,7 +98,7 @@ void message_server_parse(MSGSERVTYPE type, zmq::message_t* extra, zmq::message_
         case MSG_LINKSHELL_REMOVE:
         {
             const char* query = "SELECT server_addr, server_port FROM accounts_sessions LEFT JOIN chars ON "
-                                "accounts_sessions.charid = chars.charid WHERE charname = '%s' LIMIT 1;";
+                                "accounts_sessions.charid = chars.charid WHERE worldid = %u AND charname = '%s' LIMIT 1;";
             ret = Sql_Query(ChatSqlHandle, query, (int8*)extra->data() + 4);
             if (Sql_NumRows(ChatSqlHandle) == 0)
             {
@@ -110,29 +112,39 @@ void message_server_parse(MSGSERVTYPE type, zmq::message_t* extra, zmq::message_
         case MSG_PT_DISBAND:
         {
             const char* query = "SELECT server_addr, server_port, MIN(charid) FROM accounts_sessions JOIN accounts_parties USING (charid) "
-                                "WHERE IF (allianceid <> 0, allianceid = (SELECT MAX(allianceid) FROM accounts_parties WHERE partyid = %d), "
+                                "WHERE worldid = %u AND IF (allianceid <> 0, allianceid = (SELECT MAX(allianceid) FROM accounts_parties WHERE partyid = %d), "
                                 "partyid = %d) GROUP BY server_addr, server_port;";
             uint32 partyid = ref<uint32>((uint8*)extra->data(), 0);
-            ret = Sql_Query(ChatSqlHandle, query, partyid, partyid);
+            ret = Sql_Query(ChatSqlHandle, query, from_world, partyid, partyid);
             break;
         }
         case MSG_CHAT_LINKSHELL:
         {
             const char* query = "SELECT server_addr, server_port FROM accounts_sessions "
-                                "WHERE linkshellid1 = %d OR linkshellid2 = %d GROUP BY server_addr, server_port;";
-            ret = Sql_Query(ChatSqlHandle, query, ref<uint32>((uint8*)extra->data(), 0), ref<uint32>((uint8*)extra->data(), 0));
+                                "WHERE worldid = %u AND (linkshellid1 = %d OR linkshellid2) = %d GROUP BY server_addr, server_port;";
+            ret = Sql_Query(ChatSqlHandle, query, from_world, ref<uint32>((uint8*)extra->data(), 0), ref<uint32>((uint8*)extra->data(), 0));
             break;
         }
         case MSG_CHAT_YELL:
         {
-            const char* query = "SELECT zoneip, zoneport FROM zone_settings WHERE misc & 1024 GROUP BY zoneip, zoneport;";
-            ret = Sql_Query(ChatSqlHandle, query);
+            const char* query = "SELECT zoneip, zoneport FROM zone_servers,zone_settings WHERE zone_servers.zoneid = zone_settings.zoneid \
+                                 AND worldid = %u AND misc & 1024 GROUP BY zoneip, zoneport;";
+            ret = Sql_Query(ChatSqlHandle, query, from_world);
             ipstring = true;
             break;
         }
         case MSG_CHAT_SERVMES:
         {
-            const char* query = "SELECT zoneip, zoneport FROM zone_settings GROUP BY zoneip, zoneport;";
+            const char* query = "SELECT zoneip, zoneport FROM zone_servers,zone_settings WHERE zone_servers.zoneid = zone_settings.zoneid \
+                                 AND worldid = %u GROUP BY zoneip, zoneport;";
+            ret = Sql_Query(ChatSqlHandle, query, from_world);
+            ipstring = true;
+            break;
+        }
+        case MSG_CHAT_SERVMESGLOBAL:
+        {
+            // Send to the entire universe (all worlds)
+            const char* query = "SELECT zoneip, zoneport FROM zone_servers GROUP BY zoneip, zoneport;";
             ret = Sql_Query(ChatSqlHandle, query);
             ipstring = true;
             break;
@@ -142,14 +154,15 @@ void message_server_parse(MSGSERVTYPE type, zmq::message_t* extra, zmq::message_
         case MSG_DIRECT:
         case MSG_SEND_TO_ZONE:
         {
-            const char* query = "SELECT server_addr, server_port FROM accounts_sessions WHERE charid = %d;";
-            ret = Sql_Query(ChatSqlHandle, query, ref<uint32>((uint8*)extra->data(), 0));
+            const char* query = "SELECT server_addr, server_port FROM accounts_sessions WHERE worldid = %u AND charid = %d;";
+            ret = Sql_Query(ChatSqlHandle, query, from_world, ref<uint32>((uint8*)extra->data(), 0));
             break;
         }
         case MSG_SEND_TO_ENTITY:
         {
-            const char* query = "SELECT zoneip, zoneport FROM zone_settings WHERE zoneid = %d;";
-            ret = Sql_Query(ChatSqlHandle, query, ref<uint16>((uint8*)extra->data(), 2));
+            const char* query = "SELECT zoneip, zoneport FROM zone_servers,zone_settings WHERE zone_servers.zoneid = zone_settings.zoneid \
+                                 AND worldid = %u AND zoneid = %d;";
+            ret = Sql_Query(ChatSqlHandle, query, from_world, ref<uint16>((uint8*)extra->data(), 2));
             ipstring = true;
             break;
         }
@@ -204,6 +217,7 @@ void message_server_listen()
     while (true)
     {
         zmq::message_t from;
+        zmq::message_t world;
         zmq::message_t type;
         zmq::message_t extra;
         zmq::message_t packet;
@@ -232,17 +246,23 @@ void message_server_listen()
 
             if (more)
             {
-                zSocket->recv(&type);
+                zSocket->recv(&world);
                 zSocket->getsockopt(ZMQ_RCVMORE, &more, &size);
 
                 if (more)
                 {
-                    zSocket->recv(&extra);
+                    zSocket->recv(&type);
                     zSocket->getsockopt(ZMQ_RCVMORE, &more, &size);
 
                     if (more)
                     {
-                        zSocket->recv(&packet);
+                        zSocket->recv(&extra);
+                        zSocket->getsockopt(ZMQ_RCVMORE, &more, &size);
+
+                        if (more)
+                        {
+                            zSocket->recv(&packet);
+                        }
                     }
                 }
             }
@@ -259,7 +279,7 @@ void message_server_listen()
             ShowError("Message: %s\n", e.what());
             continue;
         }
-        message_server_parse((MSGSERVTYPE)ref<uint8>((uint8*)type.data(), 0), &extra, &packet, &from);
+        message_server_parse((MSGSERVTYPE)ref<uint8>((uint8*)type.data(), 0), &extra, &packet, &world, &from);
     }
 }
 

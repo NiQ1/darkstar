@@ -337,8 +337,8 @@ void CZone::LoadZoneSettings()
     static const char* Query =
         "SELECT "
         "zone.name,"
-        "zone.zoneip,"
-        "zone.zoneport,"
+        "zoneip,"
+        "zoneport,"
         "zone.music_day,"
         "zone.music_night,"
         "zone.battlesolo,"
@@ -348,9 +348,11 @@ void CZone::LoadZoneSettings()
         "zone.zonetype,"
         "bcnm.name "
         "FROM zone_settings AS zone "
+        "LEFT JOIN zone_servers "
+        "USING (zoneid) "
         "LEFT JOIN bcnm_info AS bcnm "
         "USING (zoneid) "
-        "WHERE zoneid = %u "
+        "WHERE zone.zoneid = %u "
         "LIMIT 1";
 
     if (Sql_Query(SqlHandle, Query, m_zoneID) != SQL_ERROR &&

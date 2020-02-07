@@ -66,6 +66,7 @@ int32 login_parse(int32 fd)
         session[fd]->session_data = new login_session_data_t{};
         sd = (login_session_data_t*)session[fd]->session_data;
         sd->serviced = 0;
+        sd->priv = 0;
         login_sd_list.push_back(sd);
         sd->client_addr = session[fd]->client_addr;
         sd->login_fd = fd;
@@ -78,8 +79,10 @@ int32 login_parse(int32 fd)
     }
 
     //all auth packets have one structure:
-    // [login][passwords][code] => summary assign 33 bytes
-    if (session[fd]->rdata.size() == 33)
+    // xiloader: [login][passwords][code] => summary assign 33 bytes
+    // eden loader: same as xiloader but pads to 256 bytes and has client MAC address at 0xC0
+    size_t datasize = session[fd]->rdata.size();
+    if ((datasize == 33) || (datasize == 256))
     {
         char* buff = &session[fd]->rdata[0];
         int8 code = ref<uint8>(buff, 32);
@@ -106,7 +109,7 @@ int32 login_parse(int32 fd)
         {
         case LOGIN_ATTEMPT:
         {
-            const char* fmtQuery = "SELECT accounts.id,accounts.status \
+            const char* fmtQuery = "SELECT accounts.id,accounts.status,accounts.priv \
                                     FROM accounts \
                                     WHERE accounts.login = '%s' AND accounts.password = PASSWORD('%s')";
             Sql_EscapeString(SqlHandle, escaped_name, name.c_str());
@@ -132,6 +135,7 @@ int32 login_parse(int32 fd)
                     //  do_close_login(sd,fd);
                     //  return 0;
                     //}
+                    sd->priv = Sql_GetUIntData(SqlHandle, 2);
                     fmtQuery = "UPDATE accounts SET accounts.timelastmodify = NULL WHERE accounts.id = %d";
                     Sql_Query(SqlHandle, fmtQuery, sd->accid);
                     fmtQuery = "SELECT charid, server_addr, server_port \
