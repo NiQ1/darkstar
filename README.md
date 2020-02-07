@@ -3,6 +3,9 @@
 Darkstar Project
 ========
 
+IMPORTANT NOTE REGARDING THIS FORK:
+THIS FORK IS AGPL LICENSED - ANY PUBLIC SERVER WHICH USES CODE FROM THIS FORK MUST PUBLISH ITS OWN SOURCE CODE AS WELL. PLEASE READ THE LICENSE FILE BEFORE USING CODE FROM THIS FORK ON YOUR SERVER.
+
 Welcome to the DarkStar project, an emulation server for FFXI.
 Visit our forums and Discord or IRC to keep in touch with the latest developments.
 
