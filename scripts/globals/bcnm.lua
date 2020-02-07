@@ -307,7 +307,7 @@ local battlefields = {
 
     [170] = {               -- FULL MOON FOUNTAIN
         { 0,  224,    0},   -- The Moonlit Path (Quest)
-     -- { 1,  225,    0},   -- Moon Reading (Windy 9-2)
+        { 1,  225,    0},   -- Moon Reading (Windy 9-2)
      -- { 2,  226,    0},   -- Waking the Beast (Quest)
      -- { 3,  227,    0},   -- Battaru Royale (ASA10)
      -- { 4,    ?,    0},   -- *The Moonlit Path (HTMBF)
@@ -459,7 +459,10 @@ function checkReqs(player, npc, bfid, registrant)
     local stc = player:hasCompletedMission(SANDORIA, mi.sandoria.SAVE_THE_CHILDREN)
     local dm1 = player:getQuestStatus(OUTLANDS, dsp.quest.id.outlands.DIVINE_MIGHT)
     local dm2 = player:getQuestStatus(OUTLANDS, dsp.quest.id.outlands.DIVINE_MIGHT_REPEAT)
-    local arkCircleOffset = zones[dsp.zone.LALOFF_AMPHITHEATER].npc.SHIMMERING_CIRCLE_OFFSET
+
+    local function getZM14Offset(offset)
+        return zones[dsp.zone.LALOFF_AMPHITHEATER].npc.SHIMMERING_CIRCLE_OFFSET + offset
+    end
 
     -- requirements to register a battlefield
     local registerReqs =
@@ -485,20 +488,20 @@ function checkReqs(player, npc, bfid, registrant)
         [ 103] = function() return ( mjob == dsp.job.SMN and mlvl >= 66                                                                                                     ) end, -- Quest: Shattering Stars (SMN LB5)
         [ 128] = function() return ( roz == mi.zilart.THE_TEMPLE_OF_UGGALEPIH                                                                                               ) end, -- ZM4: The Temple of Uggalepih
         [ 160] = function() return ( nat == 15 and natStat == 3                                                                                                             ) end, -- Mission 5-2
-        [ 161] = function() return ( basty == mi.bastok.WHERE_TWO_PATHS_CONVERGE and player:getCharVar("BASTOK92") == 1                                                     ) end, -- Basty 9-2: Where Two Paths Converge
+        [ 161] = function() return ( basty == mi.bastok.WHERE_TWO_PATHS_CONVERGE and natStat == 1                                                                           ) end, -- Basty 9-2: Where Two Paths Converge
         [ 163] = function() return ( mjob == dsp.job.SCH and mlvl >= 66                                                                                                     ) end, -- Quest: Survival of the Wisest (SCH LB5)
         [ 192] = function() return ( roz == mi.zilart.THROUGH_THE_QUICKSAND_CAVES                                                                                           ) end, -- ZM6: Through the Quicksand Caves
         [ 194] = function() return ( mjob == dsp.job.SAM and mlvl >= 66                                                                                                     ) end, -- Quest: Shattering Stars (SAM LB5)
         [ 195] = function() return ( mjob == dsp.job.NIN and mlvl >= 66                                                                                                     ) end, -- Quest: Shattering Stars (NIN LB5)
         [ 196] = function() return ( mjob == dsp.job.DRG and mlvl >= 66                                                                                                     ) end, -- Quest: Shattering Stars (DRG LB5)
         [ 224] = function() return ( player:hasKeyItem(dsp.ki.MOON_BAUBLE)                                                                                                  ) end, -- Quest: The Moonlit Path
-        [ 225] = function() return ( windy == mi.windurst.MOON_READING and player:getCharVar("WINDURST92") == 2                                                             ) end, -- Windy 9-2: Moon Reading
+        [ 225] = function() return ( windy == mi.windurst.MOON_READING and natStat == 2                                                                                     ) end, -- Windy 9-2: Moon Reading
         [ 256] = function() return ( roz == mi.zilart.RETURN_TO_DELKFUTTS_TOWER and rozStat == 3                                                                            ) end, -- ZM8: Return to Delkfutt's Tower
-        [ 288] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == arkCircleOffset + 0 and not player:hasKeyItem(dsp.ki.SHARD_OF_APATHY)        ) end, -- ZM14: Ark Angels (Hume)
-        [ 289] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == arkCircleOffset + 1 and not player:hasKeyItem(dsp.ki.SHARD_OF_COWARDICE)     ) end, -- ZM14: Ark Angels (Tarutaru)
-        [ 290] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == arkCircleOffset + 2 and not player:hasKeyItem(dsp.ki.SHARD_OF_ENVY)          ) end, -- ZM14: Ark Angels (Mithra)
-        [ 291] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == arkCircleOffset + 3 and not player:hasKeyItem(dsp.ki.SHARD_OF_ARROGANCE)     ) end, -- ZM14: Ark Angels (Elvaan)
-        [ 292] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == arkCircleOffset + 4 and not player:hasKeyItem(dsp.ki.SHARD_OF_RAGE)          ) end, -- ZM14: Ark Angels (Galka)
+        [ 288] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == getZM14Offset(0) and not player:hasKeyItem(dsp.ki.SHARD_OF_APATHY)           ) end, -- ZM14: Ark Angels (Hume)
+        [ 289] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == getZM14Offset(1) and not player:hasKeyItem(dsp.ki.SHARD_OF_COWARDICE)        ) end, -- ZM14: Ark Angels (Tarutaru)
+        [ 290] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == getZM14Offset(2) and not player:hasKeyItem(dsp.ki.SHARD_OF_ENVY)             ) end, -- ZM14: Ark Angels (Mithra)
+        [ 291] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == getZM14Offset(3) and not player:hasKeyItem(dsp.ki.SHARD_OF_ARROGANCE)        ) end, -- ZM14: Ark Angels (Elvaan)
+        [ 292] = function() return ( roz == mi.zilart.ARK_ANGELS and rozStat == 1 and npcid == getZM14Offset(4) and not player:hasKeyItem(dsp.ki.SHARD_OF_RAGE)             ) end, -- ZM14: Ark Angels (Galka)
         [ 293] = function() return ( dm1 == QUEST_ACCEPTED or dm2 == QUEST_ACCEPTED                                                                                         ) end, -- ZM14 Divine Might
         [ 320] = function() return ( roz == mi.zilart.THE_CELESTIAL_NEXUS                                                                                                   ) end, -- ZM16: The Celestial Nexus
         [ 416] = function() return ( player:hasKeyItem(dsp.ki.TUNING_FORK_OF_WIND)                                                                                          ) end, -- Quest: Trial by Wind
@@ -964,13 +967,15 @@ function EventFinishBCNM(player, csid, option)
             local stat = player:getStatusEffect(dsp.effect.BATTLEFIELD)
             local bfid = stat:getPower()
             local item = getItemById(player, bfid)
+            local initiatorId, initiatorName = player:getBattlefield():getInitiator()
+
             if item ~= 0 then
                 -- remove limbus chips
                 if zone == 37 or zone == 38 then
                     player:tradeComplete()
 
                 -- set other traded item to worn
-                elseif player:hasItem(item) then
+                elseif player:hasItem(item) and player:getName() == initiatorName then
                     player:createWornItem(item)
                 end
             end
