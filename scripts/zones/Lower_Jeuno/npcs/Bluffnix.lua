@@ -97,7 +97,8 @@ function onEventFinish(player,csid,option)
 
         player:changeContainerSize(0,5);
         player:changeContainerSize(5,5);
-        player:changeContainerSize(6,5);
+		--Removed, player needs to talk to Artisan Moogle for sack expansion after completing this quest
+        --player:changeContainerSize(6,5);
         player:addFame(JEUNO, 30);
         player:tradeComplete();
         player:completeQuest(JEUNO,TheGobbieBag[1]);

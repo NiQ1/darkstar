@@ -357,7 +357,8 @@ namespace charutils
             "campaign_allegiance,"  // 25
             "isstylelocked,"        // 26
             "moghancement,"         // 27
-            "worldid "              // 28
+            "worldid,"              // 28
+            "accid "                // 29
             "FROM chars "
             "WHERE charid = %u";
 
@@ -437,6 +438,18 @@ namespace charutils
             PChar->setStyleLocked(Sql_GetIntData(SqlHandle, 26) == 1 ? true : false);
             PChar->SetMoghancement(Sql_GetUIntData(SqlHandle, 27));
             PChar->m_world = Sql_GetUIntData(SqlHandle, 28);
+
+            // This determines whether the character has access to Mog Satchel, Mog Wardrobe #3 and Mog Wardrobe #4
+            // Interpret account features as the following bitmask -
+            // 0x01 - Has access to Mog Satchel (secure connection icon displayed on startup)
+            // 0x04 - Has access to Mog Wardrobe #3
+            // 0x08 - Has access to Mog Wardrobe #4
+            uint32 acctid = Sql_GetUIntData(SqlHandle, 29);
+            const char* pFeaturesSqlQuery = "SELECT features FROM accounts WHERE id = %u";
+            ret = Sql_Query(SqlHandle, pFeaturesSqlQuery, acctid);
+            if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS) {
+                PChar->m_accountFeatures = static_cast<uint16>(Sql_GetUIntData(SqlHandle, 0));
+            }
         }
 
         LoadSpells(PChar);

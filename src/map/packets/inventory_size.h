@@ -28,6 +28,8 @@
 
 #include "basic.h"
 
+#include "../item_container.h"
+
 /************************************************************************
 *																		*
 *  																		*
@@ -41,6 +43,9 @@ class CInventorySizePacket: public CBasicPacket
 public:
 
 	CInventorySizePacket(CCharEntity* PChar);
+
+private:
+    void GetSizeAndBuff(CCharEntity* PChar, CONTAINER_ID location, uint8 sizeOffset, uint8 buffOffset);
 };
 
 #endif

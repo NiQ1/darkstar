@@ -616,6 +616,11 @@ int32 lobbyview_parse(int32 fd)
                 }
                 else
                 {
+                    // Features bitmask:
+                    // 0x01 - Secure connection icon (does not actually affect the connection whatsoever)
+                    // 0x02 - Unknown
+                    // 0x04 - Mog Wardrobe #3 icon
+                    // 0x08 - Mog Wardrobe #4 icon
                     const char *pfmtQuery = "SELECT expansions,features FROM accounts WHERE id = %u;";
                     int32 ret = Sql_Query(SqlHandle, pfmtQuery, sd->accid);
                     if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0 && Sql_NextRow(SqlHandle) == SQL_SUCCESS)
