@@ -312,6 +312,7 @@ public:
     bool              m_EquipSwap;					// true if equipment was recently changed
     bool              m_EffectsChanged;
     time_point        m_LastSynthTime;
+    uint16            m_accountFeatures;            // Features bitmask of the char's account (used for storage access)
 
     int16 addTP(int16 tp) override;
     int32 addHP(int32 hp) override;
