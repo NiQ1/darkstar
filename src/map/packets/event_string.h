@@ -37,6 +37,7 @@
 *																		*
 ************************************************************************/
 
+class CBaseEntity;
 class CCharEntity;
 
 class CEventStringPacket : public CBasicPacket
@@ -45,6 +46,7 @@ public:
 
 	CEventStringPacket(
 		CCharEntity* PChar,
+        CBaseEntity* PNpc,
 		uint16 EventID, 
         const std::string& string0 = "",
         const std::string& string1 = "",

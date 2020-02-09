@@ -31,6 +31,7 @@
 
 CEventStringPacket::CEventStringPacket(
 	CCharEntity* PChar,
+    CBaseEntity* PNpc,
 	uint16 EventID, 
     const std::string& string0,
     const std::string& string1,
@@ -48,7 +49,7 @@ CEventStringPacket::CEventStringPacket(
 	this->type = 0x33;
 	this->size = 0x38;
 
-	ref<uint32>(0x04) = PChar->id;
+	ref<uint32>(0x04) = PNpc->id;
 	ref<uint16>(0x08) = PChar->m_TargID;
     ref<uint16>(0x0A) = PChar->getZone();
 	ref<uint16>(0x0C) = EventID;

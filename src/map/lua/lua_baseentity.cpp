@@ -1050,6 +1050,101 @@ inline int32 CLuaBaseEntity::startEvent(lua_State *L)
     PChar->pushPacket(
         new CEventPacket(
             PChar,
+            PChar,
+            EventID,
+            n - 1,
+            param0,
+            param1,
+            param2,
+            param3,
+            param4,
+            param5,
+            param6,
+            param7,
+            textTable));
+
+    // если требуется вернуть фиктивный результат, то делаем это
+    if (!lua_isnil(L, 10) && lua_isnumber(L, 10))
+    {
+        PChar->m_event.Option = (int32)lua_tointeger(L, 10);
+    }
+    return 0;
+}
+
+/************************************************************************
+*  Function: startEventNpc()
+*  Purpose : Starts an event (cutscene) with NPC ID
+*  Example : player:startEvent(4)
+*  Notes   : Cutscene ID must be associated with the zone
+************************************************************************/
+
+inline int32 CLuaBaseEntity::startEventNpc(lua_State *L)
+{
+    DSP_DEBUG_BREAK_IF(m_PBaseEntity == nullptr);
+    DSP_DEBUG_BREAK_IF(m_PBaseEntity->objtype != TYPE_PC);
+
+    DSP_DEBUG_BREAK_IF(lua_isnil(L, 1) || !lua_isnumber(L, 1));
+
+    auto PChar = dynamic_cast<CCharEntity*>(m_PBaseEntity);
+    if (!PChar)
+    {
+        ShowError("CLuaBaseEntity::startEvent: Could not start event, Base Entity is not a Character Entity.\n");
+        return 0;
+    }
+
+    int32 n = lua_gettop(L);
+
+    if (n > 10)
+    {
+        ShowError("CLuaBaseEntity::startEvent: Could not start event, Lack of arguments.\n");
+        lua_settop(L, -n);
+        return 0;
+    }
+    if (PChar->animation == ANIMATION_HEALING)
+    {
+        PChar->StatusEffectContainer->DelStatusEffect(EFFECT_HEALING);
+    }
+
+    if (PChar->PPet)
+    {
+        PChar->PPet->PAI->Disengage();
+    }
+
+    uint16 EventID = (uint16)lua_tointeger(L, 1);
+
+    uint32 param0 = 0;
+    uint32 param1 = 0;
+    uint32 param2 = 0;
+    uint32 param3 = 0;
+    uint32 param4 = 0;
+    uint32 param5 = 0;
+    uint32 param6 = 0;
+    uint32 param7 = 0;
+    int16 textTable = -1;
+
+    if (!lua_isnil(L, 2) && lua_isnumber(L, 2))
+        param0 = (uint32)lua_tointeger(L, 2);
+    if (!lua_isnil(L, 3) && lua_isnumber(L, 3))
+        param1 = (uint32)lua_tointeger(L, 3);
+    if (!lua_isnil(L, 4) && lua_isnumber(L, 4))
+        param2 = (uint32)lua_tointeger(L, 4);
+    if (!lua_isnil(L, 5) && lua_isnumber(L, 5))
+        param3 = (uint32)lua_tointeger(L, 5);
+    if (!lua_isnil(L, 6) && lua_isnumber(L, 6))
+        param4 = (uint32)lua_tointeger(L, 6);
+    if (!lua_isnil(L, 7) && lua_isnumber(L, 7))
+        param5 = (uint32)lua_tointeger(L, 7);
+    if (!lua_isnil(L, 8) && lua_isnumber(L, 8))
+        param6 = (uint32)lua_tointeger(L, 8);
+    if (!lua_isnil(L, 9) && lua_isnumber(L, 9))
+        param7 = (uint32)lua_tointeger(L, 9);
+    if (!lua_isnil(L, 10) && lua_isnumber(L, 10))
+        textTable = (int16)lua_tointeger(L, 10);
+
+    PChar->pushPacket(
+        new CEventPacket(
+            PChar,
+            PChar->m_event.Target,
             EventID,
             n - 1,
             param0,
@@ -1145,6 +1240,100 @@ inline int32 CLuaBaseEntity::startEventString(lua_State *L)
     PChar->pushPacket(
         new CEventStringPacket(
             PChar,
+            PChar,
+            EventID,
+            string0,
+            string1,
+            string2,
+            string3,
+            param0,
+            param1,
+            param2,
+            param3,
+            param4,
+            param5,
+            param6,
+            param7));
+
+    return 0;
+}
+
+/************************************************************************
+*  Function: startEventStringNpc()
+*  Purpose : Starts an event (cutscene) with string parameters (0x33 packet) and NPC ID
+*  Example : Too long to show
+*  Notes   : See scripts/zones/Aht_Urhgan_Whitegate/npcs/Ghatsad.lua
+************************************************************************/
+
+inline int32 CLuaBaseEntity::startEventStringNpc(lua_State *L)
+{
+    DSP_DEBUG_BREAK_IF(m_PBaseEntity == nullptr);
+    DSP_DEBUG_BREAK_IF(m_PBaseEntity->objtype != TYPE_PC);
+
+    DSP_DEBUG_BREAK_IF(lua_isnil(L, 1) || !lua_isnumber(L, 1));
+
+    auto PChar = dynamic_cast<CCharEntity*>(m_PBaseEntity);
+    if (!PChar)
+    {
+        ShowError("CLuaBaseEntity::startEventString: Could not start event, Base Entity is not a Character Entity.\n");
+        return 0;
+    }
+
+    if (PChar->animation == ANIMATION_HEALING)
+    {
+        PChar->StatusEffectContainer->DelStatusEffect(EFFECT_HEALING);
+    }
+
+    if (PChar->PPet)
+    {
+        PChar->PPet->PAI->Disengage();
+    }
+
+    uint16 EventID = (uint16)lua_tointeger(L, 1);
+
+    string_t string0 = "";
+    string_t string1 = "";
+    string_t string2 = "";
+    string_t string3 = "";
+
+    uint32 param0 = 0;
+    uint32 param1 = 0;
+    uint32 param2 = 0;
+    uint32 param3 = 0;
+    uint32 param4 = 0;
+    uint32 param5 = 0;
+    uint32 param6 = 0;
+    uint32 param7 = 0;
+
+    if (!lua_isnil(L, 2) && lua_isstring(L, 2))
+        string0 = lua_tolstring(L, 2, nullptr);
+    if (!lua_isnil(L, 3) && lua_isstring(L, 3))
+        string1 = lua_tolstring(L, 3, nullptr);
+    if (!lua_isnil(L, 4) && lua_isstring(L, 4))
+        string2 = lua_tolstring(L, 4, nullptr);
+    if (!lua_isnil(L, 5) && lua_isstring(L, 5))
+        string3 = lua_tolstring(L, 5, nullptr);
+    if (!lua_isnil(L, 6) && lua_isnumber(L, 6))
+        param0 = (uint32)lua_tointeger(L, 6);
+    if (!lua_isnil(L, 7) && lua_isnumber(L, 7))
+        param1 = (uint32)lua_tointeger(L, 7);
+    if (!lua_isnil(L, 8) && lua_isnumber(L, 8))
+        param2 = (uint32)lua_tointeger(L, 8);
+    if (!lua_isnil(L, 9) && lua_isnumber(L, 9))
+        param3 = (uint32)lua_tointeger(L, 9);
+    if (!lua_isnil(L, 10) && lua_isnumber(L, 10))
+        param4 = (uint32)lua_tointeger(L, 10);
+    if (!lua_isnil(L, 11) && lua_isnumber(L, 11))
+        param5 = (uint32)lua_tointeger(L, 11);
+    if (!lua_isnil(L, 12) && lua_isnumber(L, 12))
+        param6 = (uint32)lua_tointeger(L, 12);
+    if (!lua_isnil(L, 13) && lua_isnumber(L, 13))
+        param7 = (uint32)lua_tointeger(L, 13);
+
+    PChar->pushPacket(
+        new CEventStringPacket(
+            PChar,
+            PChar->m_event.Target,
             EventID,
             string0,
             string1,
@@ -13981,7 +14170,9 @@ Lunar<CLuaBaseEntity>::Register_t CLuaBaseEntity::methods[] =
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,entityAnimationPacket),
 
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,startEvent),
+    LUNAR_DECLARE_METHOD(CLuaBaseEntity,startEventNpc),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,startEventString),
+    LUNAR_DECLARE_METHOD(CLuaBaseEntity,startEventStringNpc),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,updateEvent),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,updateEventString),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,getEventTarget),

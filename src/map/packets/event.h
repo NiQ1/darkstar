@@ -36,6 +36,7 @@
 *																		*
 ************************************************************************/
 
+class CBaseEntity;
 class CCharEntity;
 
 class CEventPacket : public CBasicPacket
@@ -44,6 +45,7 @@ public:
 
 	CEventPacket(
 		CCharEntity* PChar,
+        CBaseEntity* PNpc,
 		uint16 EventID, 
 		uint8  numOfParams = 0, 
 		uint32 param0 = 0,

@@ -78,7 +78,9 @@ public:
     int32 entityAnimationPacket(lua_State* L);
 
     int32 startEvent(lua_State*);           // Begins Event
+    int32 startEventNpc(lua_State*);        // Begins Event with specified NPC ID
     int32 startEventString(lua_State*);     // Begins Event with string param (0x33 packet)
+    int32 startEventStringNpc(lua_State*);  // Begins Event with string param (0x33 packet) and specified NPC ID
     int32 updateEvent(lua_State*);          // Updates event
     int32 updateEventString(lua_State*);    // (string, string, string, string, uint32, ...)
     int32 getEventTarget(lua_State*);       //

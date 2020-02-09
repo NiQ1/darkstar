@@ -31,6 +31,7 @@
 
 CEventPacket::CEventPacket(
 	CCharEntity* PChar,
+    CBaseEntity* PNpc,
 	uint16 EventID, 
 	uint8  numOfParams, 
 	uint32 param0,
@@ -46,7 +47,7 @@ CEventPacket::CEventPacket(
 	this->type = 0x32;
 	this->size = 0x0A;
 
-	ref<uint32>(0x04) = PChar->id;
+	ref<uint32>(0x04) = PNpc->id;
 
 	if(numOfParams > 0) 
 	{

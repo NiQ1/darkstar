@@ -11,7 +11,7 @@ function onTrade(player,npc,trade)
 end
 
 function onTrigger(player,npc)
-	dsp.mogsack.artisanMoogleOnTrigger(player, 960)
+	dsp.mogsack.artisanMoogleOnTrigger(player, npc, 960)
 end
 
 function onEventUpdate(player,csid,option)

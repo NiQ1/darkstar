@@ -1,6 +1,7 @@
 -----------------------------------
 -- Mog Sack function
 -- (Artisan Moogle)
+-- NOTE: This content is AGPLv3 licensed.
 -----------------------------------
 
 require("scripts/globals/status")
@@ -16,13 +17,14 @@ require("scripts/globals/settings")
 dsp = dsp or {}
 dsp.mogsack = dsp.mogsack or {}
 
-local sackunknown1 = 0 --1074167552
-local sackunknown2 = 0 --6144
-local sackunknown3 = 0 --5256801
+local sackunknown1 = 1074167552
+local sackunknown2 = 6144
+local sackunknown3 = 5256801
 
-dsp.mogsack.artisanMoogleOnTrigger = function(player, csid)
+dsp.mogsack.artisanMoogleOnTrigger = function(player, npc, csid)
 	local sacksize
 	local menuoptions
+	local param3
 	-- Container 6 == Mog Sack
 	sacksize = player:getContainerSize(6)
 	-- We don't have a special flag indicating whether the player has a sack or not but
@@ -36,7 +38,13 @@ dsp.mogsack.artisanMoogleOnTrigger = function(player, csid)
 		-- Don't allow expansion menu options (player doesn't have a sack yet)
 		menuoptions = 10
 	end
-    player:startEvent(csid, sackunknown1, 0, 5, sacksize, sackunknown2, sackunknown3, menuoptions, 0)
+	if player:getLocalVar("talked_to_artisan") == 1 then
+		param3 = 0
+	else
+		param3 = 5
+		player:setLocalVar("talked_to_artisan", 1)
+	end
+    player:startEventNpc(csid, sackunknown1, 0, param3, sacksize, sackunknown2, sackunknown3, menuoptions, 0)
 end
 
 dsp.mogsack.artisanMoogleOnEventUpdate = function(player, csid, option)
